@@ -11,6 +11,7 @@ library(readxl) #used to import excel files
 library(tidyverse)
 library(dplyr)
 library(RSQLite)
+library(openxlsx)
 
 #Dynamic directory path mapping
 repository <- file.path(dirname(rstudioapi::getSourceEditorContext()$path))
@@ -23,14 +24,19 @@ mydb <- dbConnect(RSQLite::SQLite(), "data/vital.db")
 #--------------------------------------------------------------------------------------
 births <- read_excel("data/births.xlsx")
 
+#Generating sequential id
+births$id <- row_number(births$DOB)
+births <- births[!is.na(births$DOB), ]
+
 #Date of birth, year of birth, and month of birth
 colnames(births)[colnames(births) == "DOB"] <- "dob"
-births$date <- dmy(births$dob)
-births$yearBirth <- year(births$dob)
-births$monthBirth <- month(births$dob)
+births$date <- convertToDateTime(births$dob, origin = "1900-01-01")
+births$yearBirth <- year(births$date)
+births$monthBirth <- month(births$date)
 births$quarter <- ifelse(births$monthBirth>=1 & births$monthBirth <=3,1,
                          ifelse(births$monthBirth>=4 & births$monthBirth<=6,2,
-                                ifelse(births$monthBirth>=7 & births$monthBirth<=9,3,4)))
+                                ifelse(births$monthBirth>=7 & births$monthBirth<=9,3,
+                                       ifelse(births$monthBirth>=10 & births$monthBirth<=12,4,"NS"))))
 
 #sex of child
 colnames(births)[colnames(births) == "Gender"] <- "sex"
@@ -50,19 +56,21 @@ births$island[is.na(births$island)] <- "NS"
 
 #age and age group of mothers
 colnames(births)[colnames(births) == "DOB Mother"] <- "motherDOB"
-births$motherDOBM = month(births$motherDOB)
-births$motherDOBY = year(births$motherDOB)
+births$motherDate <- convertToDateTime(births$motherDOB, origin = "1900-01-01")
+births$motherDOBM = month(births$motherDate)
+births$motherDOBY = year(births$motherDate)
 births$motherAge = births$yearBirth - births$motherDOBY
 births$motherAge[is.na(births$motherAge)] <- "NS"
 
-births$ageGroup <- ifelse(births$motherAge<15,"<15",
-                          ifelse(births$motherAge>=15 & births$motherAge<=19,"15-19",
+births$ageGroup <- ifelse(births$motherAge == "NS","NS",
+                          ifelse(births$motherAge<15,"<15",
+                            ifelse(births$motherAge>=15 & births$motherAge<=19,"15-19",
                                  ifelse(births$motherAge>=20 & births$motherAge<=24,"20-24",
                                         ifelse(births$motherAge>=25 & births$motherAge<=29,"25-29",
                                                ifelse(births$motherAge>=30 & births$motherAge<=34,"30-34",
                                                       ifelse(births$motherAge>=35 & births$motherAge<=39, "35-39",
-                                                             ifelse(births$motherAge>=40 & births$motherAge<=44,"40-44",">45")))))))
-
+                                                             ifelse(births$motherAge>=40 & births$motherAge<=44,"40-44",
+                                                                    ifelse(births$motherAge>=45,">45","NS")))))))))
 #Place of birth
 
 
