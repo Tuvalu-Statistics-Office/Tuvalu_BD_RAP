@@ -25,6 +25,7 @@ births <- read_excel("data/births.xlsx")
 
 #Date of birth, year of birth, and month of birth
 colnames(births)[colnames(births) == "DOB"] <- "dob"
+births$date <- dmy(births$dob)
 births$yearBirth <- year(births$dob)
 births$monthBirth <- month(births$dob)
 births$quarter <- ifelse(births$monthBirth>=1 & births$monthBirth <=3,1,
