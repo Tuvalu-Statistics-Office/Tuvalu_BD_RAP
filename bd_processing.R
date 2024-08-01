@@ -72,10 +72,16 @@ births$ageGroup <- ifelse(births$motherAge == "NS","NS",
                                                              ifelse(births$motherAge>=40 & births$motherAge<=44,"40-44",
                                                                     ifelse(births$motherAge>=45,">45","NS")))))))))
 #Place of birth
-
+colnames(births)[colnames(births) == "Place of birth"] <- "placeBirth"
+#No further cleaning required, labels appear to be okay
 
 #Marital status of mother
-
+colnames(births)[colnames(births) == "Marital Status"] <- "marriedStat"
+births$marriedStat[births$marriedStat=="MARRIED"] <- "Married"
+births$marriedStat[births$marriedStat=="Maarried"] <- "Married"
+births$marriedStat[births$marriedStat=="Maried"] <- "Married"
+births$marriedStat[births$marriedStat=="married"] <- "Married"
+births$marriedStat[births$marriedStat=="Singlle"] <- "Single"
 #Count variable
 births$N <- 1
 
