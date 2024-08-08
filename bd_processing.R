@@ -149,6 +149,9 @@ deaths$place[deaths$place=="Hh"] <- "Home"
 deaths$place[deaths$place=="Hopsital"] <- "Hospital"
 deaths$place[deaths$place=="HOSPITAL"] <- "Hospital"
 deaths$place[deaths$place=="Out Island"] <- "Outer island"
+deaths$place[deaths$place=="Out island"] <- "Outer island"
+deaths$place[deaths$place=="Out Island "] <- "Outer island"
+deaths$place[deaths$place==" Out Island"] <- "Outer island"
 
 deaths$N <- 1
 dbWriteTable(mydb, "deaths", deaths, overwrite = TRUE)
