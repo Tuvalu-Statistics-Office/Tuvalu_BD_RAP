@@ -4,19 +4,13 @@
 #Ministry of Finance and Economic Development
 #Government of Tuvalu
 
-##processing arrival and departure
-
-#load libraries
-library(readxl) #used to import excel files
-library(tidyverse)
-library(dplyr)
-library(RSQLite)
-library(openxlsx)
-
 #Dynamic directory path mapping
 repository <- file.path(dirname(rstudioapi::getSourceEditorContext()$path))
 setwd(repository)
 
+source("function/setup.R")
+
+#Establish connection to SQLite database
 mydb <- dbConnect(RSQLite::SQLite(), "data/vital.db")
 
 #--------------------------------------------------------------------------------------
@@ -40,6 +34,13 @@ births$quarter <- ifelse(births$monthBirth>=1 & births$monthBirth <=3,1,
 
 #sex of child
 colnames(births)[colnames(births) == "Gender"] <- "sex"
+
+#Instead of doing the following multiple lines of code, you can just convert to lower case
+births$sexLower <- tolower(births$sex)
+
+#You can also do this so you have a capitalised first letter rather than all lower
+births$sexNormal <- paste0(toupper(substr(births$sex, 1, 1)), tolower(substr(births$sex, 2, nchar(births$sex))))
+
 births$sex[births$sex=="MALE"] <- "Male"
 births$sex[births$sex=="male"] <- "Male"
 births$sex[births$sex=="MAle"] <- "Male"
@@ -48,6 +49,13 @@ births$sex[births$sex=="female"] <- "Female"
 
 #island of births - this may not be required in the future as it is very common that more than 95% of births occur in Funafuti
 colnames(births)[colnames(births) == "Island where Birth"] <- "island"
+
+#Instead of doing the following multiple lines of code, you can just convert to lower case
+births$islandLower <- gsub(" ","", tolower(births$island))
+births$islandLower <- ifelse(grepl("una|futi", births$islandLower), "Funafuti", births$islandLower)
+
+#You can also do this so you have a capitalised first letter rather than all lower
+
 births$island[births$island=="FUNAFUTI"] <- "Funafuti"
 births$island[births$island=="funafuti"] <- "Funafuti"
 births$island[births$island=="FUNFUTI"] <- "Funafuti"
@@ -114,6 +122,22 @@ deathsDOB <- dmy(deaths$DOB)
 deaths$DOB <- convertToDateTime(deaths$DOB, origin = "1900-01-01")
 deaths$yearBirth <- year(deaths$DOB)
 deaths$Age <- deaths$yearDeath - deaths$yearBirth
+
+#You could use mutate function to create the age group
+deaths <- deaths |>
+  mutate(myageAgroup = case_when(
+    Age <= 4 ~ "0-4",
+    Age <= 9 ~ "5-9",
+    Age <= 14 ~ "10-14",
+    Age <= 19 ~ "15-19",
+    Age <= 24 ~ "20-24",
+    Age <= 29 ~ "25-29",
+    Age <= 34 ~ "30-34"
+    #Continue with the rest of the age
+  ))
+
+
+
 deaths$ageGroup <- ifelse(deaths$Age <5, "0-4",
                           ifelse(deaths$Age >= 5 & deaths$Age <=9,"5-9",
                                  ifelse(deaths$Age >= 10 & deaths$Age <=14,"10-14",
