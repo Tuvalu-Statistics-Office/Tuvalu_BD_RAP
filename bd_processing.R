@@ -27,41 +27,24 @@ colnames(births)[colnames(births) == "DOB"] <- "dob"
 births$date <- convertToDateTime(births$dob, origin = "1900-01-01")
 births$yearBirth <- year(births$date)
 births$monthBirth <- month(births$date)
-births$quarter <- ifelse(births$monthBirth>=1 & births$monthBirth <=3,1,
-                         ifelse(births$monthBirth>=4 & births$monthBirth<=6,2,
-                                ifelse(births$monthBirth>=7 & births$monthBirth<=9,3,
-                                       ifelse(births$monthBirth>=10 & births$monthBirth<=12,4,"NS"))))
+births <- births |>
+  mutate(quarter = case_when(
+    monthBirth <= 3 ~ 1,
+    monthBirth <= 6 ~ 2,
+    monthBirth <= 9 ~ 3,
+    monthBirth <= 12 ~ 4
+  ))
 
-#sex of child
+#Cleaning labels for sex
 colnames(births)[colnames(births) == "Gender"] <- "sex"
-
-#Instead of doing the following multiple lines of code, you can just convert to lower case
-births$sexLower <- tolower(births$sex)
-
-#You can also do this so you have a capitalised first letter rather than all lower
+births$sexLower <- gsub(" ","", tolower(births$sex))
 births$sexNormal <- paste0(toupper(substr(births$sex, 1, 1)), tolower(substr(births$sex, 2, nchar(births$sex))))
 
-births$sex[births$sex=="MALE"] <- "Male"
-births$sex[births$sex=="male"] <- "Male"
-births$sex[births$sex=="MAle"] <- "Male"
-births$sex[births$sex=="FEMALE"] <- "Female"
-births$sex[births$sex=="female"] <- "Female"
-
-#island of births - this may not be required in the future as it is very common that more than 95% of births occur in Funafuti
+#Cleaning labels for islands
 colnames(births)[colnames(births) == "Island where Birth"] <- "island"
-
-#Instead of doing the following multiple lines of code, you can just convert to lower case
 births$islandLower <- gsub(" ","", tolower(births$island))
 births$islandLower <- ifelse(grepl("una|futi", births$islandLower), "Funafuti", births$islandLower)
-
-#You can also do this so you have a capitalised first letter rather than all lower
-
-births$island[births$island=="FUNAFUTI"] <- "Funafuti"
-births$island[births$island=="funafuti"] <- "Funafuti"
-births$island[births$island=="FUNFUTI"] <- "Funafuti"
-births$island[births$island=="Funfuti"] <- "Funafuti"
-births$island[births$island=="F unafuti"] <- "Funafuti"
-births$island[is.na(births$island)] <- "NS"
+births$islandNormal <- paste0(toupper(substr(births$islandLower, 1, 1)), tolower(substr(births$islandLower, 2, nchar(births$islandLower))))
 
 #age and age group of mothers
 colnames(births)[colnames(births) == "DOB Mother"] <- "motherDOB"
@@ -69,28 +52,34 @@ births$motherDate <- convertToDateTime(births$motherDOB, origin = "1900-01-01")
 births$motherDOBM = month(births$motherDate)
 births$motherDOBY = year(births$motherDate)
 births$motherAge = births$yearBirth - births$motherDOBY
+births$motherAge <- ifelse(births$motherAge < 15, "ERROR", births$motherAge)
 births$motherAge[is.na(births$motherAge)] <- "NS"
+births <- births |>
+  mutate(myageGroup = case_when(
+    motherAge == "NS" ~ "NS",
+    motherAge == "ERROR" ~ "ERROR",
+    motherAge < 15 ~ "<15",
+    motherAge <= 19 ~ "15-19",
+    motherAge <= 24 ~ "20-24",
+    motherAge <= 29 ~ "25-29",
+    motherAge <= 34 ~ "30-34",
+    motherAge <= 39 ~ "35-39",
+    motherAge <= 45 ~ "40-44",
+    motherAge > 45 ~ ">45"
+  ))
 
-births$ageGroup <- ifelse(births$motherAge == "NS","NS",
-                          ifelse(births$motherAge<15,"<15",
-                            ifelse(births$motherAge>=15 & births$motherAge<=19,"15-19",
-                                 ifelse(births$motherAge>=20 & births$motherAge<=24,"20-24",
-                                        ifelse(births$motherAge>=25 & births$motherAge<=29,"25-29",
-                                               ifelse(births$motherAge>=30 & births$motherAge<=34,"30-34",
-                                                      ifelse(births$motherAge>=35 & births$motherAge<=39, "35-39",
-                                                             ifelse(births$motherAge>=40 & births$motherAge<=44,"40-44",
-                                                                    ifelse(births$motherAge>=45,">45","NS")))))))))
 #Place of birth
 colnames(births)[colnames(births) == "Place of birth"] <- "placeBirth"
-#No further cleaning required, labels appear to be okay
+births$lowerPlaceBirth <- tolower(births$placeBirth)
+births$normalPlaceBirth <- paste0(toupper(substr(births$lowerPlaceBirth, 1, 1)), tolower(substr(births$lowerPlaceBirth, 2, nchar(births$lowerPlaceBirth))))
 
 #Marital status of mother
 colnames(births)[colnames(births) == "Marital Status"] <- "marriedStat"
-births$marriedStat[births$marriedStat=="MARRIED"] <- "Married"
-births$marriedStat[births$marriedStat=="Maarried"] <- "Married"
-births$marriedStat[births$marriedStat=="Maried"] <- "Married"
-births$marriedStat[births$marriedStat=="married"] <- "Married"
-births$marriedStat[births$marriedStat=="Singlle"] <- "Single"
+births$lowerMarriedStat <- tolower(births$marriedStat)
+births$normalMarriedStat <- paste0(toupper(substr(births$lowerMarriedStat, 1, 1)), tolower(substr(births$lowerMarriedStat, 2, nchar(births$lowerMarriedStat))))
+births$normalMarriedStat[births$normalMarriedStat=="Maarried"] <- "Married"
+births$normalMarriedStat[births$normalMarriedStat=="Maried"] <- "Married"
+births$normalMarriedStat[births$normalMarriedStat=="Singlle"] <- "Single"
 #Count variable
 births$N <- 1
 dbWriteTable(mydb, "births", births, overwrite = TRUE)
@@ -122,60 +111,42 @@ deathsDOB <- dmy(deaths$DOB)
 deaths$DOB <- convertToDateTime(deaths$DOB, origin = "1900-01-01")
 deaths$yearBirth <- year(deaths$DOB)
 deaths$Age <- deaths$yearDeath - deaths$yearBirth
-
-#You could use mutate function to create the age group
 deaths <- deaths |>
-  mutate(myageAgroup = case_when(
+  mutate(myageGroup = case_when(
     Age <= 4 ~ "0-4",
     Age <= 9 ~ "5-9",
     Age <= 14 ~ "10-14",
     Age <= 19 ~ "15-19",
     Age <= 24 ~ "20-24",
     Age <= 29 ~ "25-29",
-    Age <= 34 ~ "30-34"
-    #Continue with the rest of the age
+    Age <= 34 ~ "30-34",
+    Age <= 39 ~ "35-39",
+    Age <= 44 ~ "40-44",
+    Age <= 49 ~ "45-49",
+    Age <= 54 ~ "50-54",
+    Age <= 59 ~ "55-59",
+    Age <= 64 ~ "60-64",
+    Age <= 69 ~ "65-69",
+    Age <= 74 ~ "70-74",
+    Age <= 79 ~ "75-79",
+    Age <= 84 ~ "70-84",
+    Age >= 85 ~ "85+"
   ))
-
-
-
-deaths$ageGroup <- ifelse(deaths$Age <5, "0-4",
-                          ifelse(deaths$Age >= 5 & deaths$Age <=9,"5-9",
-                                 ifelse(deaths$Age >= 10 & deaths$Age <=14,"10-14",
-                                        ifelse(deaths$Age >= 15 & deaths$Age <=19,"15-19",
-                                               ifelse(deaths$Age >= 20 & deaths$Age <=24,"20-24",
-                                                      ifelse(deaths$Age >= 25 & deaths$Age <=29,"25-29",
-                                                             ifelse(deaths$Age >= 30 & deaths$Age <=34,"30-34",
-                                                                    ifelse(deaths$Age >= 35 & deaths$Age <=39,"35-39",
-                                                                           ifelse(deaths$Age >= 40 & deaths$Age <=44,"40-44",
-                                                                                  ifelse(deaths$Age >= 45 & deaths$Age <=49,"45-49",
-                                                                                         ifelse(deaths$Age >= 50 & deaths$Age <=54,"50-54",
-                                                                                                ifelse(deaths$Age >= 55 & deaths$Age <=59,"55-59",
-                                                                                                       ifelse(deaths$Age >= 60 & deaths$Age <=64,"60-64",
-                                                                                                              ifelse(deaths$Age >= 65 & deaths$Age <=69,"65-69",
-                                                                                                                     ifelse(deaths$Age >= 70 & deaths$Age <=74,"70-74",
-                                                                                                                            ifelse(deaths$Age >= 75 & deaths$Age <=79,"75-79",
-                                                                                                                                   ifelse(deaths$Age >= 80 & deaths$Age <=84,"80-84",
-                                                                                                                                          ifelse(deaths$Age >= 85 & deaths$Age <=89,"85-89",
-                                                                                                                                                 ifelse(deaths$Age >= 90,"90+","NS")))))))))))))))))))
-deaths$ageGroup[is.na(deaths$ageGroup)] <- "NS"
+deaths$myageGroup <- ifelse(is.na(deaths$Age),"NA", deaths$myageGroup)
+deaths$myageGroup <- ifelse(deaths$Age < 0 & deaths$Age > 100,"ERROR", deaths$myageGroup)
 
 #island
 colnames(deaths)[colnames(deaths) == "Island of occurrence"] <- "island"
-deaths$island[deaths$island=="FUNAFUTI"] <- "Funafuti"
-deaths$island[deaths$island=="Fuanfuti"] <- "Funafuti"
-deaths$island[deaths$island=="NIUTAO"] <- "Niutao"
-deaths$island[deaths$island=="NMAGA"] <- "Nanumaga"
+deaths$islandLower <- gsub(" ","", tolower(deaths$island))
+deaths$islandNormal <- paste0(toupper(substr(deaths$islandLower, 1, 1)), tolower(substr(deaths$islandLower, 2, nchar(deaths$islandLower))))
+deaths$islandNormal[deaths$islandNormal=="Nmaga"] <- "Nanumaga"
 
 #place of death
 colnames(deaths)[colnames(deaths) == "Place of death"] <- "place"
-deaths$place[deaths$place=="HOME"] <- "Home"
-deaths$place[deaths$place=="Hh"] <- "Home"
-deaths$place[deaths$place=="Hopsital"] <- "Hospital"
-deaths$place[deaths$place=="HOSPITAL"] <- "Hospital"
-deaths$place[deaths$place=="Out Island"] <- "Outer island"
-deaths$place[deaths$place=="Out island"] <- "Outer island"
-deaths$place[deaths$place=="Out Island "] <- "Outer island"
-deaths$place[deaths$place==" Out Island"] <- "Outer island"
+deaths$placeLower <- gsub(" ","", tolower(deaths$place))
+deaths$placeNormal <- paste0(toupper(substr(deaths$placeLower, 1, 1)), tolower(substr(deaths$placeLower, 2, nchar(deaths$placeLower))))
+deaths$placeNormal[deaths$place=="Hh"] <- "Home"
+deaths$placeNormal[deaths$place=="Hopsital"] <- "Hospital"
 
 deaths$N <- 1
 dbWriteTable(mydb, "deaths", deaths, overwrite = TRUE)
