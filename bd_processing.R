@@ -140,6 +140,7 @@ colnames(deaths)[colnames(deaths) == "Island of occurrence"] <- "island"
 deaths$islandLower <- gsub(" ","", tolower(deaths$island))
 deaths$islandNormal <- paste0(toupper(substr(deaths$islandLower, 1, 1)), tolower(substr(deaths$islandLower, 2, nchar(deaths$islandLower))))
 deaths$islandNormal[deaths$islandNormal=="Nmaga"] <- "Nanumaga"
+deaths$islandNormal[deaths$islandNormal=="Fuanfuti"] <- "Funafuti"
 
 #place of death
 colnames(deaths)[colnames(deaths) == "Place of death"] <- "place"
@@ -147,6 +148,16 @@ deaths$placeLower <- gsub(" ","", tolower(deaths$place))
 deaths$placeNormal <- paste0(toupper(substr(deaths$placeLower, 1, 1)), tolower(substr(deaths$placeLower, 2, nchar(deaths$placeLower))))
 deaths$placeNormal[deaths$place=="Hh"] <- "Home"
 deaths$placeNormal[deaths$place=="Hopsital"] <- "Hospital"
+
+#Quarters
+colnames(deaths)[colnames(deaths) == "Quarter"] <- "quarter"
+deaths <- deaths |>
+  mutate(quarter = case_when(
+    quarter == "Q1" ~ 1,
+    quarter == "Q2" ~ 2,
+    quarter == "Q3" ~ 3,
+    quarter == "Q4" ~ 4
+    ))
 
 deaths$N <- 1
 dbWriteTable(mydb, "deaths", deaths, overwrite = TRUE)

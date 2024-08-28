@@ -28,6 +28,10 @@ endYear = 2024
 startMonth = 1
 endMonth = 6
 
+#Staff to specify the year and quarter for population estimate tables
+pop_est_year = 2024
+pop_est_qtr = 2
+
 #Connect to db
 mydb <- dbConnect(RSQLite::SQLite(), "data/vital.db")
 wb <- createWorkbook(creator = Sys.getenv("USERNAME"))
@@ -158,6 +162,19 @@ saveWorkbook(wb, file="output/Vital Tables.xlsx", overwrite = TRUE)
 #Table for population estimates
 #-----------------------------------------------------
 wb <- createWorkbook(creator = Sys.getenv("USERNAME"))
+t1 <- t1 |>
+  filter(yearBirth == pop_est_year & quarter == pop_est_qtr)
+pt <- PivotTable$new()
+pt$addData(t1)
+pt$addColumnDataGroups("sexNormal")
+pt$defineCalculation(calculationName="totalBirths", summariseExpression="format(round(sum(N), 0), big.mark = ',')")
+pt$renderPivot()
+addWorksheet(wb, "births")
+pt$writeToExcelWorksheet(wb=wb, wsName="births", 
+                         topRowNumber=1, leftMostColumnNumber=1, applyStyles=TRUE, mapStylesFromCSS=TRUE)
+
+t2 <- t2 |>
+  filter(yearDeath == pop_est_year & quarter == pop_est_qtr)
 pt <- PivotTable$new()
 pt$addData(t2)
 pt$addColumnDataGroups("Sex")
@@ -167,4 +184,4 @@ pt$renderPivot()
 addWorksheet(wb, "deaths")
 pt$writeToExcelWorksheet(wb=wb, wsName="deaths", 
                          topRowNumber=1, leftMostColumnNumber=1, applyStyles=TRUE, mapStylesFromCSS=TRUE)
-saveWorkbook(wb, file="output/deaths_popest.xlsx", overwrite = TRUE)
+saveWorkbook(wb, file="output/popest.xlsx", overwrite = TRUE)
