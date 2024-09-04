@@ -34,6 +34,7 @@ births <- births |>
     monthBirth <= 9 ~ 3,
     monthBirth <= 12 ~ 4
   ))
+births$yearQuarter <- paste0(births$yearBirth,"-",births$quarter)
 
 #Cleaning labels for sex
 colnames(births)[colnames(births) == "Gender"] <- "sex"
@@ -52,20 +53,27 @@ births$motherDate <- convertToDateTime(births$motherDOB, origin = "1900-01-01")
 births$motherDOBM = month(births$motherDate)
 births$motherDOBY = year(births$motherDate)
 births$motherAge = births$yearBirth - births$motherDOBY
-births$motherAge <- ifelse(births$motherAge < 15, "ERROR", births$motherAge)
-births$motherAge[is.na(births$motherAge)] <- "NS"
+
+#Correcting or replacing mother's age using the mean age for quarter
+meanAge <- births
+meanAge <- meanAge[!is.na(meanAge$motherAge), ]
+meanAge <- meanAge%>%
+  group_by(yearQuarter)%>%
+  summarise(meanAge = round(mean(motherAge),0))
+
+births <- merge(births, meanAge, by = "yearQuarter", ALL = TRUE)
+
+births$motherAgeCorr <- ifelse(births$motherAge < 15 | is.na(births$motherAge), births$meanAge, births$motherAge)
 births <- births |>
   mutate(myageGroup = case_when(
-    motherAge == "NS" ~ "NS",
-    motherAge == "ERROR" ~ "ERROR",
-    motherAge < 15 ~ "<15",
-    motherAge <= 19 ~ "15-19",
-    motherAge <= 24 ~ "20-24",
-    motherAge <= 29 ~ "25-29",
-    motherAge <= 34 ~ "30-34",
-    motherAge <= 39 ~ "35-39",
-    motherAge <= 45 ~ "40-44",
-    motherAge > 45 ~ ">45"
+    motherAgeCorr < 15 ~ "<15",
+    motherAgeCorr <= 19 ~ "15-19",
+    motherAgeCorr <= 24 ~ "20-24",
+    motherAgeCorr <= 29 ~ "25-29",
+    motherAgeCorr <= 34 ~ "30-34",
+    motherAgeCorr <= 39 ~ "35-39",
+    motherAgeCorr <= 45 ~ "40-44",
+    motherAgeCorr > 45 ~ ">45"
   ))
 
 #Place of birth
@@ -90,6 +98,15 @@ deaths <- read_excel("data/deaths.xlsx")
 
 deaths$id <- row_number(deaths$Quarter)
 deaths <- deaths[!is.na(deaths$Quarter), ]
+#Quarters
+colnames(deaths)[colnames(deaths) == "Quarter"] <- "quarter"
+deaths <- deaths |>
+  mutate(quarter = case_when(
+    quarter == "Q1" ~ 1,
+    quarter == "Q2" ~ 2,
+    quarter == "Q3" ~ 3,
+    quarter == "Q4" ~ 4
+  ))
 
 #Date of death, year of death, and month of death
 colnames(deaths)[colnames(deaths) == "Date of Death"] <- "DOD"
@@ -97,7 +114,7 @@ deaths$date <- convertToDateTime(deaths$DOD, origin = "1900-01-01")
 deaths$yearDeath <- year(deaths$date)
 deaths$monthDeath <- month(deaths$date)
 deaths$monthDeath[is.na(deaths$monthDeath)] <- "NS"
-
+deaths$yearQuarter <- paste0(deaths$yearDeath,"-",deaths$quarter)
 #Sex
 #Manually changing unknown sex for Iona Tinapa
 colnames(deaths)[colnames(deaths) == "Name of Deceased"] <- "name"
@@ -111,35 +128,47 @@ deathsDOB <- dmy(deaths$DOB)
 deaths$DOB <- convertToDateTime(deaths$DOB, origin = "1900-01-01")
 deaths$yearBirth <- year(deaths$DOB)
 deaths$Age <- deaths$yearDeath - deaths$yearBirth
+
+meanAge <- deaths
+meanAge <- meanAge[!is.na(meanAge$Age), ]
+meanAge <- meanAge%>%
+  group_by(yearQuarter)%>%
+  summarise(meanAge = round(mean(Age),0))
+
+deaths <- merge(deaths, meanAge, by = "yearQuarter", ALL = TRUE)
+
+deaths$ageCorr <- ifelse(deaths$Age < 15 | is.na(deaths$Age), deaths$meanAge, deaths$Age)
+
 deaths <- deaths |>
   mutate(myageGroup = case_when(
-    Age <= 4 ~ "0-4",
-    Age <= 9 ~ "5-9",
-    Age <= 14 ~ "10-14",
-    Age <= 19 ~ "15-19",
-    Age <= 24 ~ "20-24",
-    Age <= 29 ~ "25-29",
-    Age <= 34 ~ "30-34",
-    Age <= 39 ~ "35-39",
-    Age <= 44 ~ "40-44",
-    Age <= 49 ~ "45-49",
-    Age <= 54 ~ "50-54",
-    Age <= 59 ~ "55-59",
-    Age <= 64 ~ "60-64",
-    Age <= 69 ~ "65-69",
-    Age <= 74 ~ "70-74",
-    Age <= 79 ~ "75-79",
-    Age <= 84 ~ "70-84",
-    Age >= 85 ~ "85+"
+    ageCorr <= 4 ~ "0-4",
+    ageCorr <= 9 ~ "5-9",
+    ageCorr <= 14 ~ "10-14",
+    ageCorr <= 19 ~ "15-19",
+    ageCorr <= 24 ~ "20-24",
+    ageCorr <= 29 ~ "25-29",
+    ageCorr <= 34 ~ "30-34",
+    ageCorr <= 39 ~ "35-39",
+    ageCorr <= 44 ~ "40-44",
+    ageCorr <= 49 ~ "45-49",
+    ageCorr <= 54 ~ "50-54",
+    ageCorr <= 59 ~ "55-59",
+    ageCorr <= 64 ~ "60-64",
+    ageCorr <= 69 ~ "65-69",
+    ageCorr <= 74 ~ "70-74",
+    ageCorr <= 79 ~ "75-79",
+    ageCorr <= 84 ~ "70-84",
+    ageCorr >= 85 ~ "85+"
   ))
-deaths$myageGroup <- ifelse(is.na(deaths$Age),"NA", deaths$myageGroup)
-deaths$myageGroup <- ifelse(deaths$Age < 0 & deaths$Age > 100,"ERROR", deaths$myageGroup)
+deaths$myageGroup <- ifelse(is.na(deaths$ageCorr),"NA", deaths$myageGroup)
+deaths$myageGroup <- ifelse(deaths$ageCorr < 0 & deaths$ageCorr > 100,"ERROR", deaths$myageGroup)
 
 #island
 colnames(deaths)[colnames(deaths) == "Island of occurrence"] <- "island"
 deaths$islandLower <- gsub(" ","", tolower(deaths$island))
 deaths$islandNormal <- paste0(toupper(substr(deaths$islandLower, 1, 1)), tolower(substr(deaths$islandLower, 2, nchar(deaths$islandLower))))
 deaths$islandNormal[deaths$islandNormal=="Nmaga"] <- "Nanumaga"
+deaths$islandNormal[deaths$islandNormal=="Fuanfuti"] <- "Funafuti"
 
 #place of death
 colnames(deaths)[colnames(deaths) == "Place of death"] <- "place"
