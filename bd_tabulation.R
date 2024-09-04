@@ -184,4 +184,4 @@ pt$renderPivot()
 addWorksheet(wb, "deaths")
 pt$writeToExcelWorksheet(wb=wb, wsName="deaths", 
                          topRowNumber=1, leftMostColumnNumber=1, applyStyles=TRUE, mapStylesFromCSS=TRUE)
-saveWorkbook(wb, file="output/popest.xlsx", overwrite = TRUE)
+saveWorkbook(wb, file="output/pop_est_bd.xlsx", overwrite = TRUE)
