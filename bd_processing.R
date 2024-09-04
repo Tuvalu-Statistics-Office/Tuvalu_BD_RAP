@@ -137,7 +137,7 @@ meanAge <- meanAge%>%
 
 deaths <- merge(deaths, meanAge, by = "yearQuarter", ALL = TRUE)
 
-deaths$ageCorr <- ifelse(deaths$Age < 15 | is.na(deaths$Age), deaths$meanAge, deaths$Age)
+deaths$ageCorr <- ifelse(deaths$Age < 0 | is.na(deaths$Age), deaths$meanAge, deaths$Age)
 
 deaths <- deaths |>
   mutate(myageGroup = case_when(
