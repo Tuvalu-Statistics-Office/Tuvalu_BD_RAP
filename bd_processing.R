@@ -9,6 +9,7 @@ repository <- file.path(dirname(rstudioapi::getSourceEditorContext()$path))
 setwd(repository)
 
 source("function/setup.R")
+library(tcltk2)
 
 #Establish connection to SQLite database
 mydb <- dbConnect(RSQLite::SQLite(), "data/vital.db")
@@ -20,13 +21,21 @@ births <- read_excel("data/births.xlsx")
 
 #Generating sequential id
 births$id <- row_number(births$DOB)
-births <- births[!is.na(births$DOB), ]
 
 #Date of birth, year of birth, and month of birth
 colnames(births)[colnames(births) == "DOB"] <- "dob"
-births$date <- convertToDateTime(births$dob, origin = "1900-01-01")
-births$yearBirth <- year(births$date)
-births$monthBirth <- month(births$date)
+#births$date <- convertToDateTime(births$dob, origin = "1900-01-01")
+births$yearBirth <- year(births$dob)
+
+#The yearBirth variable is used for merging
+if(any(is.na(births$yearBirth))){
+  tkmessageBox(title = "Missing Key Data - Births",
+               message = "Births data has missing year",
+               icon = "info",type="ok")
+}
+#births <- births[!is.na(births$yearBirth), ]
+
+births$monthBirth <- month(births$dob)
 births <- births |>
   mutate(quarter = case_when(
     monthBirth <= 3 ~ 1,
@@ -55,15 +64,18 @@ births$motherDOBY = year(births$motherDate)
 births$motherAge = births$yearBirth - births$motherDOBY
 
 #Correcting or replacing mother's age using the mean age for quarter
-meanAge <- births
-meanAge <- meanAge[!is.na(meanAge$motherAge), ]
+meanAge <- births #create a table from the births table for mean age calculation
+meanAge <- meanAge[!is.na(meanAge$motherAge), ] #removing missing age for mother
 meanAge <- meanAge%>%
   group_by(yearQuarter)%>%
-  summarise(meanAge = round(mean(motherAge),0))
+  summarise(meanAge = round(mean(motherAge),0)) #calculating mean age grouped by quarter and year
 
-births <- merge(births, meanAge, by = "yearQuarter", ALL = TRUE)
+births <- merge(meanAge, births, by = "yearQuarter", ALL = TRUE) #merge tables births and meanAge
 
+#correcting the age of mothers
 births$motherAgeCorr <- ifelse(births$motherAge < 15 | is.na(births$motherAge), births$meanAge, births$motherAge)
+
+#creating age groups
 births <- births |>
   mutate(myageGroup = case_when(
     motherAgeCorr < 15 ~ "<15",
@@ -97,7 +109,21 @@ dbWriteTable(mydb, "births", births, overwrite = TRUE)
 deaths <- read_excel("data/deaths.xlsx")
 
 deaths$id <- row_number(deaths$Quarter)
-deaths <- deaths[!is.na(deaths$Quarter), ]
+#deaths <- deaths[!is.na(deaths$Quarter), ]
+
+#Date of death, year of death, and month of death
+colnames(deaths)[colnames(deaths) == "Date of Death"] <- "dod"
+deaths$date <- date(deaths$dod)
+deaths$yearDeath <- year(deaths$date)
+#The yearDeath variable is used for merging
+if(any(is.na(births$yearDeath))){
+  tkmessageBox(title = "Missing Key Data - Deaths",
+               message = "Deaths data has missing year.",
+               icon = "info",type="ok")
+}
+deaths$monthDeath <- month(deaths$date)
+deaths$monthDeath[is.na(deaths$monthDeath)] <- "NS"
+
 #Quarters
 colnames(deaths)[colnames(deaths) == "Quarter"] <- "quarter"
 deaths <- deaths |>
@@ -107,14 +133,8 @@ deaths <- deaths |>
     quarter == "Q3" ~ 3,
     quarter == "Q4" ~ 4
   ))
-
-#Date of death, year of death, and month of death
-colnames(deaths)[colnames(deaths) == "Date of Death"] <- "DOD"
-deaths$date <- convertToDateTime(deaths$DOD, origin = "1900-01-01")
-deaths$yearDeath <- year(deaths$date)
-deaths$monthDeath <- month(deaths$date)
-deaths$monthDeath[is.na(deaths$monthDeath)] <- "NS"
 deaths$yearQuarter <- paste0(deaths$yearDeath,"-",deaths$quarter)
+
 #Sex
 #Manually changing unknown sex for Iona Tinapa
 colnames(deaths)[colnames(deaths) == "Name of Deceased"] <- "name"
@@ -124,11 +144,12 @@ deaths$Sex[deaths$Sex==2] <- "Female"
 
 #Age and age group
 colnames(deaths)[colnames(deaths) == "Date of Birth"] <- "DOB"
-deathsDOB <- dmy(deaths$DOB)
-deaths$DOB <- convertToDateTime(deaths$DOB, origin = "1900-01-01")
+deathsDOB <- date(deaths$DOB)
+#deaths$DOB <- convertToDateTime(deaths$DOB, origin = "1900-01-01")
 deaths$yearBirth <- year(deaths$DOB)
 deaths$Age <- deaths$yearDeath - deaths$yearBirth
 
+#Imputing missing and incorrect ages
 meanAge <- deaths
 meanAge <- meanAge[!is.na(meanAge$Age), ]
 meanAge <- meanAge%>%
