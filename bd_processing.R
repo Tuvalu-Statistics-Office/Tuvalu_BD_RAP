@@ -58,9 +58,9 @@ births$islandNormal <- paste0(toupper(substr(births$islandLower, 1, 1)), tolower
 
 #age and age group of mothers
 colnames(births)[colnames(births) == "DOB Mother"] <- "motherDOB"
-births$motherDate <- convertToDateTime(births$motherDOB, origin = "1900-01-01")
-births$motherDOBM = month(births$motherDate)
-births$motherDOBY = year(births$motherDate)
+#births$motherDate <- convertToDateTime(births$motherDOB, origin = "1900-01-01")
+births$motherDOBM = month(births$motherDOB)
+births$motherDOBY = year(births$motherDOB)
 births$motherAge = births$yearBirth - births$motherDOBY
 
 #Correcting or replacing mother's age using the mean age for quarter
@@ -144,8 +144,8 @@ deaths$Sex[deaths$Sex==2] <- "Female"
 
 #Age and age group
 colnames(deaths)[colnames(deaths) == "Date of Birth"] <- "DOB"
-deathsDOB <- date(deaths$DOB)
-#deaths$DOB <- convertToDateTime(deaths$DOB, origin = "1900-01-01")
+#deathsDOB <- date(deaths$DOB)
+deaths$DOB <- convertToDateTime(deaths$DOB, origin = "1900-01-01")
 deaths$yearBirth <- year(deaths$DOB)
 deaths$Age <- deaths$yearDeath - deaths$yearBirth
 
