@@ -9,6 +9,7 @@ repository <- file.path(dirname(rstudioapi::getSourceEditorContext()$path))
 setwd(repository)
 
 source("function/setup.R")
+source("function/functions.R")
 library(tcltk2)
 
 #Establish connection to SQLite database
@@ -23,9 +24,11 @@ births <- read_excel("data/births.xlsx")
 births$id <- row_number(births$DOB)
 
 #Date of birth, year of birth, and month of birth
+#Clean date
 colnames(births)[colnames(births) == "DOB"] <- "dob"
-#births$date <- convertToDateTime(births$dob, origin = "1900-01-01")
-births$yearBirth <- year(births$dob)
+#Insert clean date function
+births$date <- cleanDate(births$dob)
+births$yearBirth <- year(births$date)
 
 #The yearBirth variable is used for merging
 if(any(is.na(births$yearBirth))){
@@ -35,15 +38,15 @@ if(any(is.na(births$yearBirth))){
 }
 #births <- births[!is.na(births$yearBirth), ]
 
-births$monthBirth <- month(births$dob)
+births$monthBirth <- month(births$date)
 births <- births |>
-  mutate(quarter = case_when(
+  mutate(calc_quart = case_when(
     monthBirth <= 3 ~ 1,
     monthBirth <= 6 ~ 2,
     monthBirth <= 9 ~ 3,
     monthBirth <= 12 ~ 4
   ))
-births$yearQuarter <- paste0(births$yearBirth,"-",births$quarter)
+births$yearQuarter <- paste0(births$yearBirth,"-",births$calc_quart)
 
 #Cleaning labels for sex
 colnames(births)[colnames(births) == "Gender"] <- "sex"
@@ -56,11 +59,17 @@ births$islandLower <- gsub(" ","", tolower(births$island))
 births$islandLower <- ifelse(grepl("una|futi", births$islandLower), "Funafuti", births$islandLower)
 births$islandNormal <- paste0(toupper(substr(births$islandLower, 1, 1)), tolower(substr(births$islandLower, 2, nchar(births$islandLower))))
 
+#Clean labels for home island using mother's HI
+colnames(births)[colnames(births) == "Home Island...18"] <- "HI"
+births$islandLower <- gsub(" ","", tolower(births$HI))
+#births$islandLower <- ifelse(grepl("una|futi", births$islandLower), "Funafuti", births$islandLower)
+births$islandNormal <- paste0(toupper(substr(births$islandLower, 1, 1)), tolower(substr(births$islandLower, 2, nchar(births$islandLower))))
+
 #age and age group of mothers
 colnames(births)[colnames(births) == "DOB Mother"] <- "motherDOB"
-#births$motherDate <- convertToDateTime(births$motherDOB, origin = "1900-01-01")
-births$motherDOBM = month(births$motherDOB)
-births$motherDOBY = year(births$motherDOB)
+births$motherDate <- cleanDate(births$motherDOB)
+births$motherDOBM = month(births$motherDate)
+births$motherDOBY = year(births$motherDate)
 births$motherAge = births$yearBirth - births$motherDOBY
 
 #Correcting or replacing mother's age using the mean age for quarter
@@ -94,7 +103,7 @@ births$lowerPlaceBirth <- tolower(births$placeBirth)
 births$normalPlaceBirth <- paste0(toupper(substr(births$lowerPlaceBirth, 1, 1)), tolower(substr(births$lowerPlaceBirth, 2, nchar(births$lowerPlaceBirth))))
 
 #Marital status of mother
-colnames(births)[colnames(births) == "Marital Status"] <- "marriedStat"
+colnames(births)[colnames(births) == "MaritalStatus"] <- "marriedStat"
 births$lowerMarriedStat <- tolower(births$marriedStat)
 births$normalMarriedStat <- paste0(toupper(substr(births$lowerMarriedStat, 1, 1)), tolower(substr(births$lowerMarriedStat, 2, nchar(births$lowerMarriedStat))))
 births$normalMarriedStat[births$normalMarriedStat=="Maarried"] <- "Married"
@@ -112,8 +121,8 @@ deaths$id <- row_number(deaths$Quarter)
 #deaths <- deaths[!is.na(deaths$Quarter), ]
 
 #Date of death, year of death, and month of death
-colnames(deaths)[colnames(deaths) == "Date of Death"] <- "dod"
-deaths$date <- date(deaths$dod)
+colnames(deaths)[colnames(deaths) == "DOD Restructure"] <- "date2"
+deaths$date <- cleanDate(deaths$date2)
 deaths$yearDeath <- year(deaths$date)
 #The yearDeath variable is used for merging
 if(any(is.na(births$yearDeath))){
@@ -122,7 +131,7 @@ if(any(is.na(births$yearDeath))){
                icon = "info",type="ok")
 }
 deaths$monthDeath <- month(deaths$date)
-deaths$monthDeath[is.na(deaths$monthDeath)] <- "NS"
+deaths$monthDeath[is.na(deaths$monthDeath)] <- 0
 
 #Quarters
 colnames(deaths)[colnames(deaths) == "Quarter"] <- "quarter"
@@ -137,16 +146,17 @@ deaths$yearQuarter <- paste0(deaths$yearDeath,"-",deaths$quarter)
 
 #Sex
 #Manually changing unknown sex for Iona Tinapa
-colnames(deaths)[colnames(deaths) == "Name of Deceased"] <- "name"
-deaths$Sex <- ifelse(deaths$name == "Iona" & deaths$Surname == "Tinapa",1,deaths$Sex)
-deaths$Sex[deaths$Sex==1] <- "Male"
-deaths$Sex[deaths$Sex==2] <- "Female"
+#colnames(deaths)[colnames(deaths) == "Name of Deceased"] <- "name"
+#deaths$Sex <- ifelse(deaths$name == "Iona" & deaths$Surname == "Tinapa",1,deaths$Sex)
+#deaths$Sex[deaths$Sex==1] <- "Male"
+#deaths$Sex[deaths$Sex==2] <- "Female"
 
 #Age and age group
-colnames(deaths)[colnames(deaths) == "Date of Birth"] <- "DOB"
+#colnames(deaths)[colnames(deaths) == "DOB"] <- "DOB"
 #deathsDOB <- date(deaths$DOB)
-deaths$DOB <- convertToDateTime(deaths$DOB, origin = "1900-01-01")
-deaths$yearBirth <- year(deaths$DOB)
+deaths$DOD_clean <- cleanDate(deaths$DOD)
+deaths$DOB_clean <- cleanDate(deaths$DOB)
+deaths$yearBirth <- year(deaths$DOB_clean)
 deaths$Age <- deaths$yearDeath - deaths$yearBirth
 
 #Imputing missing and incorrect ages
@@ -185,18 +195,18 @@ deaths$myageGroup <- ifelse(is.na(deaths$ageCorr),"NA", deaths$myageGroup)
 deaths$myageGroup <- ifelse(deaths$ageCorr < 0 & deaths$ageCorr > 100,"ERROR", deaths$myageGroup)
 
 #island
-colnames(deaths)[colnames(deaths) == "Island of occurrence"] <- "island"
+colnames(deaths)[colnames(deaths) == "Island of Occurrence"] <- "island"
 deaths$islandLower <- gsub(" ","", tolower(deaths$island))
 deaths$islandNormal <- paste0(toupper(substr(deaths$islandLower, 1, 1)), tolower(substr(deaths$islandLower, 2, nchar(deaths$islandLower))))
-deaths$islandNormal[deaths$islandNormal=="Nmaga"] <- "Nanumaga"
-deaths$islandNormal[deaths$islandNormal=="Fuanfuti"] <- "Funafuti"
+#deaths$islandNormal[deaths$islandNormal=="Nmaga"] <- "Nanumaga"
+#deaths$islandNormal[deaths$islandNormal=="Fuanfuti"] <- "Funafuti"
 
 #place of death
-colnames(deaths)[colnames(deaths) == "Place of death"] <- "place"
+colnames(deaths)[colnames(deaths) == "PoD"] <- "place"
 deaths$placeLower <- gsub(" ","", tolower(deaths$place))
 deaths$placeNormal <- paste0(toupper(substr(deaths$placeLower, 1, 1)), tolower(substr(deaths$placeLower, 2, nchar(deaths$placeLower))))
-deaths$placeNormal[deaths$place=="Hh"] <- "Home"
-deaths$placeNormal[deaths$place=="Hopsital"] <- "Hospital"
+#deaths$placeNormal[deaths$place=="Hh"] <- "Home"
+#deaths$placeNormal[deaths$place=="Hopsital"] <- "Hospital"
 
 deaths$N <- 1
 dbWriteTable(mydb, "deaths", deaths, overwrite = TRUE)
